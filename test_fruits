@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>フルーツ検索システム</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f5f7f9;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { font-size: 1.5rem; color: #2c3e50; text-align: center; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+        .result-item {
+            background: #f8faff;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .result-id { font-weight: bold; color: #2980b9; }
+        .no-result { text-align: center; color: #95a5a6; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>フルーツ検索（外部CSV読込版）</h1>
+
+    <label for="fruitSelector">検索したい項目を選択：</label>
+    <select id="fruitSelector">
+        <option value="">データを読み込み中...</option>
+    </select>
+
+    <div id="resultArea"></div>
+</div>
+
+<script>
+    const csvFileName = 'test_fruits.csv'; // 読み込むファイル名
+    let headers = [];
+    let csvData = [];
+
+    // 1. 外部CSVファイルを読み込む関数
+    async function loadCSV() {
+        try {
+            const response = await fetch(csvFileName);
+            if (!response.ok) throw new Error('ファイルが見つかりません');
+            
+            const text = await response.text();
+            const lines = text.trim().split(/\r?\n/);
+            
+            // ヘッダー（1行目）の取得
+            headers = lines[0].split(',');
+            const fruitNames = headers.slice(1); // 2列目以降が果物名
+            
+            // データのパース
+            csvData = lines.slice(1).map(line => {
+                const values = line.split(',');
+                return {
+                    id: values[0],
+                    flags: values.slice(1)
+                };
+            });
+
+            // プルダウンの更新
+            initSelector(fruitNames);
+
+        } catch (error) {
+            console.error(error);
+            document.getElementById('fruitSelector').innerHTML = '<option>エラー: CSVを読み込めません</option>';
+        }
+    }
+
+    // 2. プルダウンの生成
+    function initSelector(fruitNames) {
+        const selector = document.getElementById('fruitSelector');
+        selector.innerHTML = '<option value="">選択してください</option>';
+        
+        fruitNames.forEach(name => {
+            if(name.trim() === "") return;
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            selector.appendChild(option);
+        });
+    }
+
+    // 3. 検索処理
+    document.getElementById('fruitSelector').addEventListener('change', function() {
+        const selectedFruit = this.value;
+        const resultArea = document.getElementById('resultArea');
+        resultArea.innerHTML = '';
+
+        if (!selectedFruit) return;
+
+        const fruitIndex = headers.indexOf(selectedFruit) - 1; // ID列を除いたインデックス
+        const filtered = csvData.filter(row => row.flags[fruitIndex] === '1');
+
+        if (filtered.length > 0) {
+            filtered.forEach(row => {
+                // その番号に '1' が立っている果物をすべて抽出
+                const included = headers.slice(1).filter((name, idx) => row.flags[idx] === '1');
+                
+                const div = document.createElement('div');
+                div.className = 'result-item';
+                div.innerHTML = `
+                    <div class="result-id">番号: ${row.id}</div>
+                    <div>含まれる全項目: ${included.join(', ')}</div>
+                `;
+                resultArea.appendChild(div);
+            });
+        } else {
+            resultArea.innerHTML = '<p class="no-result">該当するデータはありません。</p>';
+        }
+    });
+
+    // 起動時に実行
+    loadCSV();
+</script>
+
+</body>
+</html>
